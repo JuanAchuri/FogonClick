@@ -29,13 +29,13 @@ app.use((error, _req, res, _next) => {
 
 // SOCKET.IO - CHAT
 io.on('connection', (socket) => {
-    const rol = socket.handshake.auth.rol || "Usuario";
+    const rol = socket.handshake?.auth?.rol || "Usuario";
     socket.data.rol = rol;
 
     console.log(`🟢 ${rol} conectado al chat.`);
 
     socket.on('chat message', (msg) => {
-        console.log(`📨 ${rol} envió:`, msg); 
+        console.log(`📨 ${rol} envió:`, msg);
         io.emit('chat message', msg);
     });
 
