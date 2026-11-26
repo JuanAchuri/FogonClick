@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Pool } = require('pg');
 
 const cadenaConexion = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_DATABASE_URL;
@@ -27,7 +28,8 @@ async function ejecutar(sql, parametros = []) {
     try {
         return await piscina.query(sql, parametros);
     } catch (error) {
-        throw new ErrorBaseDatos(error.message, error.code === '23505' ? 409 : 500, error.code);
+        const estado = error.code === '23505' ? 409 : (error.status || 500);
+        throw new ErrorBaseDatos(error.message, estado, error.code);
     }
 }
 
@@ -40,8 +42,13 @@ async function transaccion(trabajo) {
         await conexion.query('COMMIT');
         return resultado;
     } catch (error) {
-        await conexion.query('ROLLBACK');
-        throw new ErrorBaseDatos(error.message, error.code === '23505' ? 409 : 500, error.code);
+        try {
+            await conexion.query('ROLLBACK');
+        } catch (_) {
+            // Evita ocultar el error original si el ROLLBACK falla
+        }
+        const estado = error.code === '23505' ? 409 : (error.status || 500);
+        throw new ErrorBaseDatos(error.message, estado, error.code);
     } finally {
         conexion.release();
     }
