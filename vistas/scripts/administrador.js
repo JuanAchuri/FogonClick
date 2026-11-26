@@ -1,9 +1,36 @@
-
-// URL base de la API del servidor backend
-const URL_API = 'http://localhost:3000/api/admin';
+// URL base de la API del servidor backend (dinámica según el host actual)
+const URL_API = `${window.location.origin}/api/admin`;
 
 // Variable para controlar auto-refresh de inventario
 let intervaloInventario = null;
+
+// Obtiene el token de acceso guardado en sesión o almacenamiento local
+function obtenerTokenSesion() {
+    return (
+        sessionStorage.getItem('supabase_access_token') ||
+        sessionStorage.getItem('access_token') ||
+        sessionStorage.getItem('token') ||
+        localStorage.getItem('supabase_access_token') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token') ||
+        ''
+    );
+}
+
+// Wrapper de fetch con cabecera de autorización y cookies de sesión
+async function fetchAdmin(url, opciones = {}) {
+    const token = obtenerTokenSesion();
+    const headers = {
+        ...(opciones.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+
+    return fetch(url, {
+        credentials: 'include',
+        ...opciones,
+        headers
+    });
+}
 
 
 // NAVEGACIÓN ENTRE SECCIONES
@@ -25,7 +52,7 @@ function mostrarSeccion(seccion) {
     const botonEl = document.querySelector(`.nav-item[data-section="${seccion}"]`);
     if (botonEl) botonEl.classList.add('active');
 
-    //  Recargar insumos al volver a la pestaña
+    // Recargar insumos al volver a la pestaña
     if (seccion === 'inventario') {
         window.addEventListener('focus', recargarInsumosSiEsInventario);
     } else {
@@ -84,12 +111,12 @@ async function bloquearEnvioDuplicado(e, guardar) {
 
 // Lee la empresa guardada al iniciar sesión; el servidor valida la empresa desde la sesión.
 function getIdEmpresa() {
-    const id = sessionStorage.getItem('id_empresa');
+    const id = sessionStorage.getItem('id_empresa') || localStorage.getItem('id_empresa');
     if (!id || id === 'null' || id === 'undefined') {
-        console.warn('⚠️ No hay id_empresa en localStorage. Usando fallback 1.');
+        console.warn('⚠️ No hay id_empresa en sesión. Usando fallback 1.');
         return 1;
     }
-    return parseInt(id);
+    return parseInt(id, 10);
 }
 
 // Obtiene del navegador el identificador del empleado autenticado.
@@ -111,6 +138,7 @@ function escaparHTML(valor) {
 
 // Limpia la sesión local y vuelve a la página de inicio de sesión.
 function cerrarSesion() {
+    sessionStorage.clear();
     localStorage.clear();
     window.location.href = '/index.html';
 }
@@ -118,7 +146,7 @@ function cerrarSesion() {
 // Consulta los empleados en la BD y llena la tabla del HTML
 async function cargarEmpleados() {
     try {
-        const res = await fetch(`${URL_API}/empleados`);
+        const res = await fetchAdmin(`${URL_API}/empleados`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -172,7 +200,7 @@ async function guardarEmpleado(e) {
     };
 
     try {
-        const res = await fetch(`${URL_API}/empleados`, {
+        const res = await fetchAdmin(`${URL_API}/empleados`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -201,7 +229,7 @@ function Form_Eliminar_Empleado() {
 // Carga el select de empleados excluyendo al admin
 async function cargarSelectEmpleadosEliminar() {
     try {
-        const res = await fetch(`${URL_API}/empleados`);
+        const res = await fetchAdmin(`${URL_API}/empleados`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -235,7 +263,7 @@ async function confirmarEliminarEmpleado(e) {
     if (!await confirmarNotificacion('¿Estás seguro de eliminar este empleado?', 'Eliminar empleado')) return;
 
     try {
-        const res = await fetch(`${URL_API}/empleados/${id}`, { method: 'DELETE' });
+        const res = await fetchAdmin(`${URL_API}/empleados/${id}`, { method: 'DELETE' });
         const datos = await res.json();
         if (datos.success) {
             cerrarModal('modal-eliminar-empleado');
@@ -252,7 +280,7 @@ async function confirmarEliminarEmpleado(e) {
 // Abre el modal para editar un empleado
 async function Form_Editar_Empleado() {
     try {
-        const res = await fetch(`${URL_API}/empleados`);
+        const res = await fetchAdmin(`${URL_API}/empleados`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -297,7 +325,7 @@ function onCambiarEmpleadoEditar() {
     document.getElementById('edit-emp-id').value = id;
 
     // Carga datos del empleado seleccionado
-    fetch(`${URL_API}/empleados/${id}`)
+    fetchAdmin(`${URL_API}/empleados/${id}`)
         .then(r => r.json())
         .then(datos => {
             // Ignora respuestas antiguas si ya se seleccionó otro empleado.
@@ -373,7 +401,7 @@ async function guardarEdicionEmpleado(e) {
     }
 
     try {
-        const res = await fetch(`${URL_API}/empleados/${id}`, {
+        const res = await fetchAdmin(`${URL_API}/empleados/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -394,10 +422,10 @@ async function guardarEdicionEmpleado(e) {
 
 // PROVEEDORES
 
-// Consulta los proveedores en la BD y llenar la tabla
+// Consulta los proveedores en la BD y llena la tabla
 async function cargarProveedores() {
     try {
-        const res = await fetch(`${URL_API}/proveedores`);
+        const res = await fetchAdmin(`${URL_API}/proveedores`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -439,7 +467,7 @@ async function guardarProveedor(e) {
     };
 
     try {
-        const res = await fetch(`${URL_API}/proveedores`, {
+        const res = await fetchAdmin(`${URL_API}/proveedores`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -461,7 +489,7 @@ async function guardarProveedor(e) {
 // Abre el modal para eliminar un proveedor
 async function Eliminar_Proveedor() {
     try {
-        const res = await fetch(`${URL_API}/proveedores`);
+        const res = await fetchAdmin(`${URL_API}/proveedores`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -492,7 +520,7 @@ async function confirmarEliminarProveedor(e) {
     if (!await confirmarNotificacion('¿Estás seguro de eliminar este proveedor?', 'Eliminar proveedor')) return;
 
     try {
-        const res = await fetch(`${URL_API}/proveedores/${id}`, { method: 'DELETE' });
+        const res = await fetchAdmin(`${URL_API}/proveedores/${id}`, { method: 'DELETE' });
         const datos = await res.json();
         if (datos.success) {
             cerrarModal('modal-eliminar-proveedor');
@@ -509,7 +537,7 @@ async function confirmarEliminarProveedor(e) {
 // Abre el modal para editar un proveedor
 async function Editar_Proveedor() {
     try {
-        const res = await fetch(`${URL_API}/proveedores`);
+        const res = await fetchAdmin(`${URL_API}/proveedores`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -544,7 +572,7 @@ function onCambiarProveedorEditar() {
     document.getElementById('edit-prov-id').value = id;
 
     // Carga datos del proveedor seleccionado
-    fetch(`${URL_API}/proveedores/${id}`)
+    fetchAdmin(`${URL_API}/proveedores/${id}`)
         .then(r => r.json())
         .then(datos => {
             if (!datos.success) {
@@ -591,7 +619,7 @@ async function guardarEdicionProveedor(e) {
     }
 
     try {
-        const res = await fetch(`${URL_API}/proveedores/${id}`, {
+        const res = await fetchAdmin(`${URL_API}/proveedores/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -615,11 +643,8 @@ async function guardarEdicionProveedor(e) {
 // Consulta los insumos en la BD y llena la tabla
 async function cargarInsumos() {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
-        
-        // DEBUG: Ver qué devuelve el servidor
-        console.log('Respuesta insumos:', datos);
         
         if (!datos.success) return;
 
@@ -630,7 +655,6 @@ async function cargarInsumos() {
         }
 
         tbody.innerHTML = datos.insumos.map(i => {
-           
             let fecha = '-';
             if (i.FECHA_VENCIMIENTO) {
                 const f = new Date(i.FECHA_VENCIMIENTO);
@@ -654,7 +678,7 @@ async function cargarInsumos() {
 
 async function Mostrar_INSUMOS_POR_VENCER() {
     try {
-        const respuesta = await fetch(`${URL_API}/insumos/por-vencer`);
+        const respuesta = await fetchAdmin(`${URL_API}/insumos/por-vencer`);
         const datos = await respuesta.json();
         if (!respuesta.ok || !datos.success) throw new Error(datos.message || 'No se pudo consultar el inventario.');
 
@@ -675,7 +699,7 @@ async function Mostrar_INSUMOS_POR_VENCER() {
 // Abre el reabastecimiento mostrando únicamente insumos cuyo stock actual es cero.
 async function Reabastecer_INSUMO() {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
         if (!datos.success) return;
         const agotados = datos.insumos.filter(insumo => Number(insumo.STOCK) === 0);
@@ -700,7 +724,7 @@ async function onCambiarInsumoReabastecer() {
     document.getElementById('reabastecer-insumo-id').value = id;
     if (!id) return;
     try {
-        const datos = await (await fetch(`${URL_API}/insumos/${id}`)).json();
+        const datos = await (await fetchAdmin(`${URL_API}/insumos/${id}`)).json();
         if (!datos.success) return;
         document.getElementById('reabastecer-fecha').value = datos.insumo.FECHA_VENCIMIENTO || '';
     } catch (_error) {
@@ -718,7 +742,7 @@ async function guardarReabastecimiento(evento) {
         return;
     }
     try {
-        const res = await fetch(`${URL_API}/insumos/${id}/reabastecer`, {
+        const res = await fetchAdmin(`${URL_API}/insumos/${id}/reabastecer`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fecha_vencimiento: fecha, stock })
@@ -745,7 +769,7 @@ async function Agregar_INSUMO() {
     document.getElementById('ing-unidad-nueva').style.display = 'none';
     document.getElementById('ing-modal-titulo').textContent = 'Nuevo Ingrediente';
     
-    // Carga proveedores en el select
+    // Carga proveedores y unidades en los selects
     await cargarSelectProveedores();
     await cargarSelectUnidades();
     
@@ -755,7 +779,7 @@ async function Agregar_INSUMO() {
 // Carga las unidades guardadas en unidad_medida y conserva las opciones base.
 async function cargarSelectUnidades() {
     try {
-        const res = await fetch(`${URL_API}/unidades`);
+        const res = await fetchAdmin(`${URL_API}/unidades`);
         const datos = await res.json();
         if (!datos.success) return;
         const select = document.getElementById('ing-unidad-selector');
@@ -778,7 +802,7 @@ function toggleNuevaUnidad() {
 // Carga los proveedores en el select del modal insumo
 async function cargarSelectProveedores() {
     try {
-        const res = await fetch(`${URL_API}/proveedores`);
+        const res = await fetchAdmin(`${URL_API}/proveedores`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -789,8 +813,7 @@ async function cargarSelectProveedores() {
 }
 
 // Guarda el nuevo insumo en la BD
-// Si en un insumo directo osea un producto tambien se guarda en la entidad producto
-// Obtiene el ID de la empresa del usuario logueado
+// Si es un insumo directo (producto) también se guarda en la entidad producto
 async function guardarIngrediente(e) {
     e.preventDefault();
 
@@ -817,7 +840,7 @@ async function guardarIngrediente(e) {
 
     const payload = {
         id_empresa: getIdEmpresa(),
-        id_proveedor: proveedorId ? parseInt(proveedorId) : null,
+        id_proveedor: proveedorId ? parseInt(proveedorId, 10) : null,
         nombre: document.getElementById('ing-nombre').value.trim(),
         unidad,
         stock: parseFloat(document.getElementById('ing-stock').value),
@@ -827,7 +850,6 @@ async function guardarIngrediente(e) {
     };
 
     if (esDirecto) {
-        // Validación obligatoria por JS 
         const precio = parseFloat(document.getElementById('ing-precio').value);
         if (!precio || precio <= 0) {
             mostrarNotificacion('El precio es obligatorio para productos directos');
@@ -836,7 +858,6 @@ async function guardarIngrediente(e) {
         }
         payload.precio = precio;
 
-        // si eligió nueva, tomar el texto del input
         let categoria = document.getElementById('ing-categoria').value;
         if (categoria === '__nueva__') {
             categoria = document.getElementById('ing-categoria-nueva').value.trim();
@@ -864,7 +885,7 @@ async function guardarIngrediente(e) {
     }
 
     try {
-        const res = await fetch(`${URL_API}/insumos`, {
+        const res = await fetchAdmin(`${URL_API}/insumos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -887,7 +908,7 @@ async function guardarIngrediente(e) {
 // Abre el modal para eliminar un insumo
 async function Eliminar_INSUMO() {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -918,7 +939,7 @@ async function confirmarEliminarInsumo(e) {
     if (!await confirmarNotificacion('¿Estás seguro de eliminar este insumo?', 'Eliminar insumo')) return;
 
     try {
-        const res = await fetch(`${URL_API}/insumos/${id}`, { method: 'DELETE' });
+        const res = await fetchAdmin(`${URL_API}/insumos/${id}`, { method: 'DELETE' });
         const datos = await res.json();
         if (datos.success) {
             cerrarModal('modal-eliminar-insumo');
@@ -935,7 +956,7 @@ async function confirmarEliminarInsumo(e) {
 // Abre el modal para editar un insumo
 async function Editar_INSUMO() {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -974,7 +995,7 @@ function onCambiarInsumoEditar() {
     document.getElementById('edit-insumo-id').value = id;
 
     // Carga datos del insumo seleccionado
-    fetch(`${URL_API}/insumos/${id}`)
+    fetchAdmin(`${URL_API}/insumos/${id}`)
         .then(r => r.json())
         .then(datos => {
             if (!datos.success) {
@@ -988,12 +1009,12 @@ function onCambiarInsumoEditar() {
             document.getElementById('edit-insumo-unidad').value = i.UNIDAD;
             document.getElementById('edit-insumo-stock').value = i.STOCK;
             
-            // Selecciona el proveedor actual (o '' si no tiene)
+            // Selecciona el proveedor actual (o 'null' si no tiene)
             const provSelect = document.getElementById('edit-insumo-proveedor');
             if (i.ID_PROVEEDOR) {
                 provSelect.value = i.ID_PROVEEDOR;
             } else {
-                provSelect.value = 'null'; // Selecciona "Sin proveedor"
+                provSelect.value = 'null';
             }
         })
         .catch(() => {
@@ -1004,7 +1025,7 @@ function onCambiarInsumoEditar() {
 // Carga proveedores en el select de editar insumo
 async function cargarSelectProveedoresEditar() {
     try {
-        const res = await fetch(`${URL_API}/proveedores`);
+        const res = await fetchAdmin(`${URL_API}/proveedores`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1039,9 +1060,9 @@ async function guardarEdicionInsumo(e) {
     
     const proveedorId = document.getElementById('edit-insumo-proveedor').value;
     if (proveedorId === 'null') {
-        payload.id_proveedor = null;  // Quitar proveedor
+        payload.id_proveedor = null;
     } else if (proveedorId) {
-        payload.id_proveedor = parseInt(proveedorId);  // Cambiar proveedor
+        payload.id_proveedor = parseInt(proveedorId, 10);
     }
 
     if (Object.keys(payload).length === 0) {
@@ -1050,7 +1071,7 @@ async function guardarEdicionInsumo(e) {
     }
 
     try {
-        const res = await fetch(`${URL_API}/insumos/${id}`, {
+        const res = await fetchAdmin(`${URL_API}/insumos/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1076,7 +1097,6 @@ function toggleProductoDirecto() {
     const camposDirecto = document.getElementById('campos-directo');
     const grupoUnidad = document.getElementById('grupo-unidad-insumo');
     
-    // Campos que deben ser obligatorios solo cuando es directo
     const precio = document.getElementById('ing-precio');
     const categoria = document.getElementById('ing-categoria');
     const foto = document.getElementById('ing-foto');
@@ -1088,7 +1108,6 @@ function toggleProductoDirecto() {
         grupoUnidad.style.display = 'none';
         camposDirecto.style.display = 'block';
         
-        // Hacer obligatorios dinámicamente
         precio.required = true;
         categoria.required = true;
         foto.required = true;
@@ -1098,7 +1117,6 @@ function toggleProductoDirecto() {
         grupoUnidad.style.display = '';
         camposDirecto.style.display = 'none';
         
-        // Quitar obligatoriedad y limpiar valores
         precio.required = false;
         categoria.required = false;
         foto.required = false;
@@ -1133,7 +1151,7 @@ function toggleNuevaCategoriaInsumo() {
 // Consulta los productos en la BD y llena la tabla
 async function cargarProductos() {
     try {
-        const res = await fetch(`${URL_API}/productos`);
+        const res = await fetchAdmin(`${URL_API}/productos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1194,7 +1212,7 @@ async function guardarProducto(e) {
     }
 
     const payload = {
-        id_empresa: 1,
+        id_empresa: getIdEmpresa(),
         nombre: document.getElementById('prod-nombre').value.trim(),
         precio: parseFloat(document.getElementById('prod-precio').value),
         categoria: categoria,
@@ -1203,7 +1221,7 @@ async function guardarProducto(e) {
     };
 
     try {
-        const res = await fetch(`${URL_API}/productos`, {
+        const res = await fetchAdmin(`${URL_API}/productos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1225,7 +1243,7 @@ async function guardarProducto(e) {
 // Abre el modal para eliminar un producto
 async function Eliminar_PRODUCTO() {
     try {
-        const res = await fetch(`${URL_API}/productos`);
+        const res = await fetchAdmin(`${URL_API}/productos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1256,7 +1274,7 @@ async function confirmarEliminarProducto(e) {
     if (!await confirmarNotificacion('¿Estás seguro de eliminar este producto?', 'Eliminar producto')) return;
 
     try {
-        const res = await fetch(`${URL_API}/productos/${id}`, { method: 'DELETE' });
+        const res = await fetchAdmin(`${URL_API}/productos/${id}`, { method: 'DELETE' });
         const datos = await res.json();
         if (datos.success) {
             cerrarModal('modal-eliminar-producto');
@@ -1273,7 +1291,7 @@ async function confirmarEliminarProducto(e) {
 // Abre el modal para editar un producto
 async function Editar_PRODUCTO() {
     try {
-        const res = await fetch(`${URL_API}/productos`);
+        const res = await fetchAdmin(`${URL_API}/productos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1281,7 +1299,6 @@ async function Editar_PRODUCTO() {
         select.innerHTML = '<option value="">-- Elige un producto --</option>' +
             datos.productos.map(p => `<option value="${p.ID}">${p.NOMBRE}</option>`).join('');
 
-        // Limpia todos los campos
         document.getElementById('edit-prod-id').value = '';
         document.getElementById('edit-prod-nombre').value = '';
         document.getElementById('edit-prod-precio').value = '';
@@ -1291,7 +1308,6 @@ async function Editar_PRODUCTO() {
         document.getElementById('edit-prod-descripcion').value = '';
         document.getElementById('edit-prod-foto').value = '';
 
-        // Carga categorías existentes en el select
         await cargarCategoriasEditar();
 
         document.getElementById('modal-editar-producto').classList.add('active');
@@ -1301,15 +1317,13 @@ async function Editar_PRODUCTO() {
 // Carga las categorías existentes en el select de editar
 async function cargarCategoriasEditar() {
     try {
-        const res = await fetch(`${URL_API}/productos`);
+        const res = await fetchAdmin(`${URL_API}/productos`);
         const datos = await res.json();
         if (!datos.success) return;
 
-        // Extrae categorías únicas
         const categorias = [...new Set(datos.productos.map(p => p.CATEGORIA).filter(c => c))];
         
         const select = document.getElementById('edit-prod-categoria');
-        // Mantiene las primeras opciones
         select.innerHTML = '<option value="">-- Conservar actual --</option>' +
             categorias.map(c => `<option value="${c}">${c}</option>`).join('') +
             '<option value="__nueva__">+ Crear nueva categoría...</option>';
@@ -1332,7 +1346,6 @@ function toggleEditarCategoria() {
 // Carga los datos del producto seleccionado en el formulario
 function onCambiarProductoEditar() {
     const id = document.getElementById('edit-prod-selector').value;
-    console.log('ID seleccionado:', id);
     
     if (!id) {
         document.getElementById('edit-prod-id').value = '';
@@ -1349,27 +1362,18 @@ function onCambiarProductoEditar() {
 
     document.getElementById('edit-prod-id').value = id;
 
-    fetch(`${URL_API}/productos/${id}`)
+    fetchAdmin(`${URL_API}/productos/${id}`)
         .then(r => {
-            console.log('Status respuesta:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(datos => {
-            console.log('Datos recibidos:', datos);
-            
             if (!datos.success) {
-                console.error('success=false:', datos.message);
                 document.getElementById('edit-prod-id').value = '';
                 return;
             }
             
             const p = datos.producto;
-            console.log('Producto:', p);
-            console.log('NOMBRE:', p.NOMBRE);
-            console.log('PRECIO:', p.PRECIO);
-            console.log('CATEGORIA:', p.CATEGORIA);
-            
             document.getElementById('edit-prod-nombre').value = p.NOMBRE || '';
             document.getElementById('edit-prod-precio').value = p.PRECIO || '';
             document.getElementById('edit-prod-descripcion').value = p.DESCRIPCION || '';
@@ -1377,7 +1381,6 @@ function onCambiarProductoEditar() {
             const fotoInput = document.getElementById('edit-prod-foto');
             if (fotoInput && fotoInput.type !== 'file') fotoInput.value = p.FOTO || '';
 
-            // CATEGORÍA 
             const catSelect = document.getElementById('edit-prod-categoria');
             const catInputNueva = document.getElementById('edit-prod-categoria-nueva');
             const catActual = p.CATEGORIA || '';
@@ -1420,7 +1423,6 @@ async function guardarEdicionProducto(e) {
         return;
     }
 
-    // Solo envía los campos que tienen valor
     const payload = {};
     
     const nombre = document.getElementById('edit-prod-nombre').value.trim();
@@ -1449,7 +1451,7 @@ async function guardarEdicionProducto(e) {
     }
 
     try {
-        const res = await fetch(`${URL_API}/productos/${id}`, {
+        const res = await fetchAdmin(`${URL_API}/productos/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1474,48 +1476,43 @@ async function guardarEdicionProducto(e) {
 async function cargarEstadisticas() {
     try {
         await cargarEstadisticasPorPeriodo('diario');
-        // Pedidos hoy (completados)
-        const resPedidos = await fetch(`${URL_API}/estadisticas/pedidos-hoy`);
+
+        const resPedidos = await fetchAdmin(`${URL_API}/estadisticas/pedidos-hoy`);
         const datosPedidos = await resPedidos.json();
         const elPedidos = document.getElementById('dash-pedidos');
         if (elPedidos && datosPedidos.success) {
             elPedidos.textContent = datosPedidos.total;
         }
 
-        // Ventas hoy
-        const resVentas = await fetch(`${URL_API}/estadisticas/ventas-hoy`);
+        const resVentas = await fetchAdmin(`${URL_API}/estadisticas/ventas-hoy`);
         const datosVentas = await resVentas.json();
         const elVentas = document.getElementById('dash-ventas');
         if (elVentas && datosVentas.success) {
             elVentas.textContent = `$${formatearPrecioAdmin(datosVentas.total)}`;
         }
 
-        // Más vendido
-        const resTop = await fetch(`${URL_API}/estadisticas/mas-vendido`);
+        const resTop = await fetchAdmin(`${URL_API}/estadisticas/mas-vendido`);
         const datosTop = await resTop.json();
         const elTop = document.getElementById('dash-top');
         if (elTop && datosTop.success) {
             elTop.textContent = datosTop.nombre;
         }
 
-        // Gastos
-        const resGastos = await fetch(`${URL_API}/estadisticas/gastos`);
+        const resGastos = await fetchAdmin(`${URL_API}/estadisticas/gastos`);
         const datosGastos = await resGastos.json();
         const elGastos = document.getElementById('dash-gastos');
         if (elGastos && datosGastos.success) {
             elGastos.textContent = `$${formatearPrecioAdmin(datosGastos.total)}`;
         }
 
-        // Ingresos
-        const resIngresos = await fetch(`${URL_API}/estadisticas/ingresos`);
+        const resIngresos = await fetchAdmin(`${URL_API}/estadisticas/ingresos`);
         const datosIngresos = await resIngresos.json();
         const elIngresos = document.getElementById('dash-ingresos');
         if (elIngresos && datosIngresos.success) {
             elIngresos.textContent = `$${formatearPrecioAdmin(datosIngresos.total)}`;
         }
 
-        // Ganancias
-        const resGanancias = await fetch(`${URL_API}/estadisticas/ganancias`);
+        const resGanancias = await fetchAdmin(`${URL_API}/estadisticas/ganancias`);
         const datosGanancias = await resGanancias.json();
         const elGanancias = document.getElementById('dash-ganancias');
         if (elGanancias && datosGanancias.success) {
@@ -1538,7 +1535,7 @@ async function cargarEstadisticasPorPeriodo(periodo) {
     const ventas = document.getElementById('estadisticas-ventas-periodo');
     const recaudado = document.getElementById('estadisticas-recaudado-periodo');
     try {
-        const respuesta = await fetch(`${URL_API}/estadisticas/ventas-rango?periodo=${encodeURIComponent(periodo)}`);
+        const respuesta = await fetchAdmin(`${URL_API}/estadisticas/ventas-rango?periodo=${encodeURIComponent(periodo)}`);
         const datos = await respuesta.json();
         if (!respuesta.ok || !datos.success) throw new Error(datos.message || 'No se pudieron cargar las estadísticas.');
         ventas.textContent = String(datos.ventas_totales || 0);
@@ -1621,7 +1618,7 @@ function formatearPrecioAdmin(valor) {
 async function cargarFacturas(anio = '') {
     try {
         const fechaInput = document.getElementById('hist-fecha').value.trim();
-        let url = `${URL_API}/facturas?id_empresa=1`;
+        let url = `${URL_API}/facturas?id_empresa=${encodeURIComponent(getIdEmpresa())}`;
         if (anio === '2025') {
             url += '&anio=2025';
             document.getElementById('hist-fecha').value = '';
@@ -1640,7 +1637,7 @@ async function cargarFacturas(anio = '') {
             url += `&dia=${dia}&mes=${mes}`;
         }
 
-        const res = await fetch(url);
+        const res = await fetchAdmin(url);
         const datos = await res.json();
         
         if (!datos.success) return;
@@ -1652,8 +1649,9 @@ async function cargarFacturas(anio = '') {
             event.preventDefault();
             const tab = window.open('about:blank', '_blank');
             try {
-                const token = sessionStorage.getItem('supabase_access_token');
+                const token = obtenerTokenSesion();
                 const responsePdf = await fetch(link.dataset.facturaApi, {
+                    credentials: 'include',
                     headers: token ? { Authorization: `Bearer ${token}` } : {}
                 });
                 if (!responsePdf.ok) {
@@ -1721,7 +1719,7 @@ async function cargarFacturas(anio = '') {
 // Consulta las recetas en la BD y llena la tabla
 async function cargarRecetas() {
     try {
-        const res = await fetch(`${URL_API}/recetas`);
+        const res = await fetchAdmin(`${URL_API}/recetas`);
         const datos = await res.json();
         
         if (!datos.success) return;
@@ -1753,10 +1751,8 @@ async function Agregar_RECETA() {
     document.getElementById('form-receta-agregar').reset();
     document.getElementById('receta-modal-titulo').textContent = 'Nueva Receta';
     
-    // Carga productos en el select
     await cargarSelectProductosReceta();
     
-    // Limpia y añade una fila de insumo vacía
     const container = document.getElementById('receta-insumos-container');
     container.innerHTML = '';
     agregarFilaInsumo();
@@ -1767,7 +1763,7 @@ async function Agregar_RECETA() {
 // Carga los productos en el select de receta
 async function cargarSelectProductosReceta() {
     try {
-        const res = await fetch(`${URL_API}/productos`);
+        const res = await fetchAdmin(`${URL_API}/productos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1795,14 +1791,13 @@ function agregarFilaInsumo() {
     `;
     container.appendChild(fila);
     
-    // Carga insumos en el select recién creado
     cargarSelectInsumosEnFila(fila.querySelector('.receta-insumo-select'));
 }
 
 // Carga insumos en un select específico
 async function cargarSelectInsumosEnFila(selectElement) {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1821,18 +1816,15 @@ async function guardarReceta(e) {
         return;
     }
 
-    // Toma el nombre del producto seleccionado para usarlo como nombre de receta
     const productoSelect = document.getElementById('receta-producto');
     const nombreReceta = productoSelect.options[productoSelect.selectedIndex].text.split('—')[0].trim();
 
-    // Validación: descripción obligatoria
     const descripcion = document.getElementById('receta-descripcion').value.trim();
     if (!descripcion) {
         mostrarNotificacion('La descripción es obligatoria');
         return;
     }
 
-    // Recolecta los insumos
     const filas = document.querySelectorAll('#receta-insumos-container .two-columns');
     const insumos = [];
     
@@ -1846,21 +1838,21 @@ async function guardarReceta(e) {
         }
         
         insumos.push({
-            id_insumo: parseInt(idInsumo),
+            id_insumo: parseInt(idInsumo, 10),
             cantidad: parseFloat(cantidad)
         });
     }
 
     const payload = {
         id_empresa: getIdEmpresa(),
-        id_producto: parseInt(idProducto),
+        id_producto: parseInt(idProducto, 10),
         nombre: nombreReceta,      
         descripcion: descripcion,  
         insumos: insumos
     };
 
     try {
-        const res = await fetch(`${URL_API}/recetas`, {
+        const res = await fetchAdmin(`${URL_API}/recetas`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1882,7 +1874,7 @@ async function guardarReceta(e) {
 // Abre el modal para eliminar una receta
 async function Eliminar_RECETA() {
     try {
-        const res = await fetch(`${URL_API}/recetas`);
+        const res = await fetchAdmin(`${URL_API}/recetas`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -1913,7 +1905,7 @@ async function confirmarEliminarReceta(e) {
     if (!await confirmarNotificacion('¿Estás seguro de eliminar esta receta?', 'Eliminar receta')) return;
 
     try {
-        const res = await fetch(`${URL_API}/recetas/${id}`, { method: 'DELETE' });
+        const res = await fetchAdmin(`${URL_API}/recetas/${id}`, { method: 'DELETE' });
         const datos = await res.json();
         if (datos.success) {
             cerrarModal('modal-eliminar-receta');
@@ -1930,8 +1922,7 @@ async function confirmarEliminarReceta(e) {
 // Abre el modal para editar una receta
 async function Editar_RECETA() {
     try {
-        // Carga recetas en el selector
-        const resRecetas = await fetch(`${URL_API}/recetas`);
+        const resRecetas = await fetchAdmin(`${URL_API}/recetas`);
         const datosRecetas = await resRecetas.json();
         if (!datosRecetas.success) return;
 
@@ -1939,12 +1930,10 @@ async function Editar_RECETA() {
         select.innerHTML = '<option value="">-- Elige una receta --</option>' +
             datosRecetas.recetas.map(r => `<option value="${r.ID}">${r.NOMBRE}</option>`).join('');
 
-        // Limpia campos
         document.getElementById('edit-receta-id').value = '';
         document.getElementById('edit-receta-nombre').value = '';
         document.getElementById('edit-receta-descripcion').value = '';
         
-        // Limpia insumos
         const container = document.getElementById('edit-receta-insumos-container');
         container.innerHTML = '';
 
@@ -1967,7 +1956,7 @@ async function onCambiarRecetaEditar() {
     document.getElementById('edit-receta-id').value = id;
 
     try {
-        const res = await fetch(`${URL_API}/recetas/${id}`);
+        const res = await fetchAdmin(`${URL_API}/recetas/${id}`);
         const datos = await res.json();
         
         if (!datos.success) {
@@ -1979,7 +1968,6 @@ async function onCambiarRecetaEditar() {
         document.getElementById('edit-receta-nombre').value = r.NOMBRE || '';
         document.getElementById('edit-receta-descripcion').value = r.DESCRIPCION || '';
         
-        // Insumos
         const container = document.getElementById('edit-receta-insumos-container');
         container.innerHTML = '';
 
@@ -2016,7 +2004,6 @@ async function agregarFilaInsumoEditar(idInsumo = '', cantidad = '') {
     container.appendChild(fila);
     fila.querySelector('.editar-receta-quitar-insumo').addEventListener('click', () => fila.remove());
     
-    // Carga insumos y selecciona el actual si aplica
     const select = fila.querySelector('.edit-receta-insumo-select');
     await cargarSelectInsumosEditar(select, idInsumo);
 }
@@ -2024,7 +2011,7 @@ async function agregarFilaInsumoEditar(idInsumo = '', cantidad = '') {
 // Carga insumos en el select de editar
 async function cargarSelectInsumosEditar(selectElement, idSeleccionado = '') {
     try {
-        const res = await fetch(`${URL_API}/insumos`);
+        const res = await fetchAdmin(`${URL_API}/insumos`);
         const datos = await res.json();
         if (!datos.success) return;
 
@@ -2048,7 +2035,6 @@ async function guardarEdicionReceta(e) {
         return;
     }
 
-    // Solo envía los campos que tienen valor
     const payload = {};
     
     const nombre = document.getElementById('edit-receta-nombre').value.trim();
@@ -2057,7 +2043,6 @@ async function guardarEdicionReceta(e) {
     const descripcion = document.getElementById('edit-receta-descripcion').value.trim();
     if (descripcion) payload.descripcion = descripcion;
     
-    // Recolecta insumos
     const filas = document.querySelectorAll('#edit-receta-insumos-container .two-columns');
     const insumos = [];
     
@@ -2067,13 +2052,12 @@ async function guardarEdicionReceta(e) {
         
         if (idInsumo && cantidad) {
             insumos.push({
-                id_insumo: parseInt(idInsumo),
+                id_insumo: parseInt(idInsumo, 10),
                 cantidad: parseFloat(cantidad)
             });
         }
     }
 
-    // La tabla detalle_receta solo admite un registro por insumo en cada receta.
     const cantidadesPorInsumo = new Map();
     for (const item of insumos) {
         cantidadesPorInsumo.set(
@@ -2083,17 +2067,15 @@ async function guardarEdicionReceta(e) {
     }
     const insumosUnicos = Array.from(cantidadesPorInsumo, ([id_insumo, cantidad]) => ({ id_insumo, cantidad }));
 
-    // Siempre se envía la lista completa: [] elimina todos los detalles existentes.
     payload.insumos = insumosUnicos;
 
-    // Si no hay nada que actualizar
     if (Object.keys(payload).length === 0) {
         mostrarNotificacion('No hay cambios para guardar');
         return;
     }
 
     try {
-        const res = await fetch(`${URL_API}/recetas/${id}`, {
+        const res = await fetchAdmin(`${URL_API}/recetas/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -2133,7 +2115,6 @@ window.guardarEdicionReceta = guardarEdicionReceta;
 function cerrarModal(id) {
     document.getElementById(id).classList.remove('active');
 
-    // Si el modal es de insumos, recargar la tabla automáticamente
     const modalesInsumo = ['modal-ingrediente', 'modal-editar-insumo', 'modal-eliminar-insumo'];
     if (modalesInsumo.includes(id)) {
         cargarInsumos();
