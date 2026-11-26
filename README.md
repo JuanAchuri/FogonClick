@@ -10,6 +10,8 @@ La aplicacion utiliza Node.js y Express en el servidor, HTML5, CSS3 y JavaScript
 
 - Juan Andres Rodriguez Achuri - 20242578062
 - Matteo Figueroa Mendez - 20242578021
+- Karol Sofia Fonseca - 20242578063
+- Joan Esteban Abello - 2042578187
 
 ## Enlaces de referencia
 
