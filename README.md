@@ -30,7 +30,7 @@ La primera version fue desarrollada como un prototipo de aproximadamente 24 hora
 1. **Carrito:** el usuario selecciona productos desde el panel de Caja.
 2. **Escaneo y pago:** el sistema genera un codigo QR dinamico mediante Factus Pay. En pruebas puede utilizarse el simulador de Factus Pay: [https://pay-api-sandbox.factus.com.co/simulator](https://pay-api-sandbox.factus.com.co/simulator).
 3. **Validacion y facturacion:** al confirmarse el pago, la aplicacion valida la operacion, genera la factura electronica mediante Factus y la somete al flujo de validacion de la DIAN gestionado por Factus.
-4. **Entrega:** cuando se solicita, el comprobante se envia automaticamente al correo del cliente mediante SMTP.
+4. **Entrega:** cuando se solicita, el comprobante se envia automaticamente al correo del cliente mediante SMTP (tenga en cuenta que si hace el intento de recuperar la contraseña o obtener su factura al correo mediante el despliegue web no servira, ya que el hosting en este caso Render bloquea las peticiones SMTP).
 
 ## Requisitos
 
