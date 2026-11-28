@@ -175,6 +175,7 @@ CREATE TABLE factura (
     FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE RESTRICT
 );
 
+--Creamos una vista de las facturas del año 2025
 CREATE OR REPLACE VIEW vista_facturas_2025 AS
 SELECT id_factura, total, fec_creacion, url_factura, id_pedido, id_empresa
 FROM factura
@@ -242,4 +243,3 @@ CREATE TRIGGER tr_before_delete_proveedor
 BEFORE DELETE ON proveedor
 FOR EACH ROW
 EXECUTE FUNCTION registrar_proveedor_eliminado();
-
